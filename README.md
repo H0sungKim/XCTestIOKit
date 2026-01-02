@@ -1,2 +1,2 @@
 # XCTestIOKit
-XCTestIOKit provides simple APIs for capturing standard input and output in Swift XCTest environments.
+A lightweight XCTest extension to easily mock standard input and assert standard output in Swift.
