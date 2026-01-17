@@ -29,8 +29,8 @@ extension XCTestCase {
     ///   - expected: The expected string to be compared against the captured output.
     ///   - target: A closure containing the code under test that reads from input and writes to output.
     public func assertIO(input: String, expected: String, target: () -> Void) {
-        let output: String? = runWithIO(input: input, block: target)
-        XCTAssertEqual(output, expected)
+        let actual: String? = runWithIO(input: input, block: target)
+        XCTAssertEqual(actual, expected)
     }
     
     /// Executes a block of code while redirecting standard input and standard output.
