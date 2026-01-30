@@ -34,9 +34,11 @@ extension XCTestCase {
     }
     
     /// Executes a block of code while redirecting standard input and standard output.
+    ///
     /// - Parameters:
     ///   - input: A string to be written to standard input.
     ///   - block: A closure to execute while I/O is redirected.
+    ///
     /// - Returns: The captured standard output as a string.
     internal func runWithIO(input: String, block: () -> Void) -> String? {
         let outputPipe = Pipe()
