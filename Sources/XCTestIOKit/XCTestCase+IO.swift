@@ -7,6 +7,7 @@
 
 import XCTest
 
+@available(iOS 18.0, macOS 15.0, *)
 extension XCTestCase {
     
     /// Asserts that a given block of code produces the expected output for a given input.
@@ -28,8 +29,16 @@ extension XCTestCase {
     ///   - input: The string to be injected into the standard input stream.
     ///   - expected: The expected string to be compared against the captured output.
     ///   - target: A closure containing the code under test that reads from input and writes to output.
-    public func assertIO(input: String, expected: String, target: () -> Void) {
-        let actual: String? = runWithIO(input: input, block: target)
+    public func assertIO(input: String, expected: String, target: () -> Void, timeLimit: Int128? = nil, memoryLimit: mach_vm_size_t? = nil) {
+        let (actual, time, memory) = runWithIO(input: input, block: target)
+        
+        if let timeLimit, time > timeLimit {
+            XCTFail("time")
+        }
+        if let memoryLimit, memory > memoryLimit {
+            XCTFail("memory")
+        }
+        
         XCTAssertEqual(actual, expected)
     }
     
@@ -40,7 +49,7 @@ extension XCTestCase {
     ///   - block: A closure to execute while I/O is redirected.
     ///
     /// - Returns: The captured standard output as a string.
-    internal func runWithIO(input: String, block: () -> Void) -> String? {
+    private func runWithIO(input: String, block: () -> Void) -> (output: String?, time: Int128, memory: mach_vm_size_t) {
         let outputPipe = Pipe()
         let inputPipe = Pipe()
         
@@ -63,7 +72,7 @@ extension XCTestCase {
             inputPipe.fileHandleForWriting.closeFile()
         }
         
-        block()
+        let (time, memory) = runWithProfiling(block)
         
         fflush(stdout)
         outputPipe.fileHandleForWriting.closeFile()
@@ -74,6 +83,33 @@ extension XCTestCase {
         let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
         let outputString = String(data: outputData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        return outputString
+        return (outputString, time, memory)
+    }
+    
+    private func peakResidentSize() -> mach_vm_size_t? {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        
+        let kerr: kern_return_t = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(
+                    mach_task_self_,
+                    task_flavor_t(MACH_TASK_BASIC_INFO),
+                    $0,
+                    &count
+                )
+            }
+        }
+        
+        return kerr == KERN_SUCCESS ? info.resident_size_max : nil
+    }
+    
+    private func runWithProfiling(_ block: () -> Void) -> (time: Int128, memory: mach_vm_size_t) {
+        let clock = ContinuousClock()
+        
+        let time = clock.measure(block).attoseconds
+        let memory = peakResidentSize() ?? 0
+        
+        return (time, memory)
     }
 }
