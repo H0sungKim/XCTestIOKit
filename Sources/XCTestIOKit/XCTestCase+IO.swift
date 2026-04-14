@@ -29,17 +29,30 @@ extension XCTestCase {
     ///   - input: The string to be injected into the standard input stream.
     ///   - expected: The expected string to be compared against the captured output.
     ///   - target: A closure containing the code under test that reads from input and writes to output.
-    public func assertIO(input: String, expected: String, target: () -> Void, timeLimit: Int128? = nil, memoryLimit: mach_vm_size_t? = nil) {
+    public func assertIO(input: String, expected: String, target: () -> Void, timeLimit: Duration? = nil, memoryLimit: Memory? = nil, file: StaticString = #filePath, line: UInt = #line) {
         let (actual, time, memory) = runWithIO(input: input, block: target)
         
-        if let timeLimit, time > timeLimit {
-            XCTFail("time")
+        if let timeLimit, time > timeLimit.attoseconds {
+            XCTFail("Time Limit Exceeded: \(time) > \(timeLimit.attoseconds)", file: file, line: line)
         }
-        if let memoryLimit, memory > memoryLimit {
-            XCTFail("memory")
+        if let memoryLimit, memory > memoryLimit.bytes {
+            XCTFail("Memory Limit Exceeded: \(memory) > \(memoryLimit.bytes)", file: file, line: line)
         }
         
-        XCTAssertEqual(actual, expected)
+        XCTAssertEqual(
+            actual,
+            expected,
+            """
+            Wrong Answer
+            Expected:
+            \(expected)
+
+            Actual:
+            \(actual ?? "")
+            """,
+            file: file,
+            line: line
+        )
     }
     
     /// Executes a block of code while redirecting standard input and standard output.
